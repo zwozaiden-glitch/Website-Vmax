@@ -41,6 +41,14 @@ const DISCORD_TICKET_URL = "https://discord.gg/xFeX95Evce";
 const PRICING = { starter: "Free", enjoy: "$2/mo", vmax: "$5/mo" };
 const KEYDROP_SECONDS = 12; // length of the demo keydrop countdown
 
+/* ✏️ Email + password login (login.html).
+   Change these to whatever email/password you want people to log in with.
+   NOTE: this is a static site, so the check happens in the browser —
+   it's a simple gate for the dashboard, not real server-side security. */
+const LOGIN_EMAIL = "admin@vmax.dev";
+const LOGIN_PASSWORD = "vmax123";
+const LOGIN_HINT = true; // set to false to hide the demo-credentials hint box
+
 // Built from the values above — the standard Discord OAuth2 authorize URL.
 const DISCORD_LOGIN_URL =
   "https://discord.com/oauth2/authorize" +
@@ -303,3 +311,134 @@ const yearEl = document.getElementById("year");
 if (yearEl) {
   yearEl.textContent = new Date().getFullYear();
 }
+
+/* ==========================================================================
+   9. Email + password login (login.html + dashboard gating)
+   ========================================================================== */
+const LOGIN_SESSION_KEY = "vmax_session";
+
+function getLoginSession() {
+  try {
+    return JSON.parse(localStorage.getItem(LOGIN_SESSION_KEY));
+  } catch (e) {
+    return null;
+  }
+}
+
+function isLoggedIn() {
+  const s = getLoginSession();
+  return !!(s && s.email);
+}
+
+function logout() {
+  try {
+    localStorage.removeItem(LOGIN_SESSION_KEY);
+  } catch (e) {
+    /* ignore */
+  }
+  window.location.href = "login.html";
+}
+
+/* --- Login page wiring ---------------------------------------------------- */
+const loginForm = document.getElementById("login-form");
+
+if (loginForm) {
+  // Already logged in? Straight to the dashboard.
+  if (isLoggedIn()) {
+    window.location.replace("dashboard.html");
+  }
+
+  const emailInput = document.getElementById("login-email");
+  const passwordInput = document.getElementById("login-password");
+  const errorEl = document.getElementById("login-error");
+  const submitBtn = document.getElementById("login-submit");
+  const pwToggle = document.getElementById("pw-toggle");
+
+  // Demo-credentials hint (filled from the config, or hidden).
+  const hintBox = document.getElementById("login-hint");
+  if (hintBox) {
+    if (LOGIN_HINT) {
+      document.getElementById("hint-email").textContent = LOGIN_EMAIL;
+      document.getElementById("hint-password").textContent = LOGIN_PASSWORD;
+    } else {
+      hintBox.hidden = true;
+    }
+  }
+
+  // Show / hide password.
+  if (pwToggle) {
+    pwToggle.addEventListener("click", function () {
+      const show = passwordInput.type === "password";
+      passwordInput.type = show ? "text" : "password";
+      pwToggle.classList.toggle("showing", show);
+      pwToggle.setAttribute("aria-pressed", String(show));
+      pwToggle.setAttribute("aria-label", show ? "Hide password" : "Show password");
+      passwordInput.focus();
+    });
+  }
+
+  function showError(message) {
+    if (!errorEl) return;
+    errorEl.textContent = message;
+    errorEl.hidden = false;
+    errorEl.classList.remove("shake");
+    // restart the shake animation
+    void errorEl.offsetWidth;
+    errorEl.classList.add("shake");
+  }
+
+  loginForm.addEventListener("submit", function (event) {
+    event.preventDefault();
+
+    const email = (emailInput.value || "").trim().toLowerCase();
+    const password = passwordInput.value || "";
+
+    if (!email || !password) {
+      showError("Please enter both your email and password.");
+      return;
+    }
+
+    if (email !== LOGIN_EMAIL.toLowerCase() || password !== LOGIN_PASSWORD) {
+      showError("Wrong email or password. Try again.");
+      passwordInput.value = "";
+      passwordInput.focus();
+      return;
+    }
+
+    // Success — remember the session and open the dashboard.
+    submitBtn.disabled = true;
+    submitBtn.textContent = "Logging in…";
+    try {
+      localStorage.setItem(
+        LOGIN_SESSION_KEY,
+        JSON.stringify({ email: LOGIN_EMAIL, at: Date.now() })
+      );
+    } catch (e) {
+      /* ignore — login still proceeds for this visit */
+    }
+    window.location.href = "dashboard.html";
+  });
+}
+
+/* --- Dashboard gating ------------------------------------------------------ */
+// dashboard.html has data-protected on <body>: no session -> back to login.
+if (document.body.hasAttribute("data-protected") && !isLoggedIn()) {
+  window.location.replace("login.html");
+}
+
+/* --- Nav auth button (shows Login / Log out depending on session) ---------- */
+document.querySelectorAll("[data-auth-cta]").forEach(function (el) {
+  if (isLoggedIn()) {
+    el.textContent = "Log out";
+    el.removeAttribute("href");
+    el.style.cursor = "pointer";
+    el.addEventListener("click", function (event) {
+      event.preventDefault();
+      logout();
+    });
+  } else {
+    el.textContent = "Login";
+    el.setAttribute("href", "login.html");
+  }
+});
+

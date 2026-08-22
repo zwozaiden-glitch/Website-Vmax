@@ -27,7 +27,7 @@
 
   <link rel="stylesheet" href="styles.css" />
 </head>
-<body>
+<body data-protected>
 
   <div class="bg-orbs" aria-hidden="true">
     <span class="orb orb-1"></span>
@@ -55,7 +55,7 @@
         <a href="index.html#api">API</a>
         <a href="index.html#pricing">Pricing</a>
         <a href="index.html#faq">FAQ</a>
-        <a class="btn btn-primary btn-sm nav-cta" href="#" data-discord-login target="_blank" rel="noopener">Login with Discord</a>
+        <a class="btn btn-primary btn-sm nav-cta" href="login.html" data-auth-cta>Login</a>
       </nav>
 
       <button class="hamburger" id="hamburger" aria-label="Toggle menu" aria-expanded="false" aria-controls="nav-links">
@@ -71,20 +71,20 @@
       <div class="container">
         <div class="section-head reveal">
           <span class="eyebrow">Dashboard</span>
-          <h2>Log in with Discord. <span class="gradient-text">Manage everything.</span></h2>
+          <h2>Log in. <span class="gradient-text">Manage everything.</span></h2>
           <p>Every script gets its own web dashboard. Generate and drop keys, blacklist users, and watch validations — no commands required.</p>
         </div>
 
         <div class="dashboard-grid">
           <div class="dashboard-copy reveal">
             <ul class="dashboard-points">
-              <li>Log in with Discord — no separate account to create.</li>
+              <li>Log in with just your email and password.</li>
               <li><code class="inline-code">/setup</code> creates a dashboard for each script automatically.</li>
               <li>Generate keys, run key drops and blacklist users in a click.</li>
               <li>Live validation logs and active-key counts.</li>
             </ul>
             <div class="dashboard-cta">
-              <a class="btn btn-primary" href="#" data-discord-login target="_blank" rel="noopener">Login with Discord</a>
+              <a class="btn btn-primary" href="login.html">Login</a>
               <a class="btn btn-ghost" href="index.html">Back to home</a>
             </div>
           </div>
