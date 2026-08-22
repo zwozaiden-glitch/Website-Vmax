@@ -69,6 +69,17 @@
         <a href="#faq">FAQ</a>
       </nav>
 
+      <div class="nav-auth" id="nav-auth">
+        <a class="btn btn-primary btn-sm" id="nav-login" href="#" data-login>Log in</a>
+        <div class="user-chip" id="nav-user" hidden>
+          <a class="user-link" id="nav-user-link" href="dashboard.html" aria-label="Open dashboard">
+            <img class="user-avatar" id="nav-avatar" alt="" />
+            <span class="user-name" id="nav-username"></span>
+          </a>
+          <button class="user-logout" id="nav-logout" type="button">Log out</button>
+        </div>
+      </div>
+
       <button class="hamburger" id="hamburger" aria-label="Toggle menu" aria-expanded="false" aria-controls="nav-links">
         <span></span><span></span><span></span>
       </button>
@@ -493,5 +504,6 @@
   </footer>
 
   <script src="script.js"></script>
+  <script src="auth.js"></script>
 </body>
 </html>
