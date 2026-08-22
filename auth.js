@@ -12,19 +12,23 @@ const PVAuth = (function () {
      CONFIG — the ONLY things you need to change for real Discord login:
        1. CLIENT_ID  -> your Discord application's Client ID
                          (Discord Developer Portal -> Application -> OAuth2)
-       2. In the Developer Portal, add this site's dashboard page as a
-          Redirect:  <your-site>/dashboard.html   (must match exactly)
-       3. (optional) TOKEN_PROXY -> set this if your browser blocks the
-          direct token exchange with CORS. See auth-proxy/server.mjs.
+       2. In the Developer Portal, add this site's dashboard route as a
+          Redirect:  <your-site>/dashboard   (must match exactly)
+       3. BOT_API_BASE -> the public URL of the connected Discord bot
+          service. It must expose POST /token and the dashboard API.
      ---------------------------------------------------------------------- */
+  const BOT_API_BASE = "https://discord-project-production-a058.up.railway.app";
+
   const CONFIG = {
     CLIENT_ID: "1540626944557850624", // <-- your Discord app's Client ID
-    REDIRECT_PATH: "https://vmax-host.up.railway.app/dashboard",
+    // /dashboard is the public route; the Railway server serves it with
+    // dashboard.html behind the scenes.
+    REDIRECT_PATH: "/dashboard",
     SCOPES: "identify email",
-    TOKEN_PROXY: "/token", // Proxies token exchange via backend to bypass browser CORS
-    // Lets visitors open /dashboard.html?demo=1 to preview the UI without a
-    // real Discord app. Turn off once CLIENT_ID is set if you don't want it.
-    DEMO_ENABLED: true,
+    // Use the real bot service for the OAuth token exchange. It already
+    // exposes POST /token with CORS enabled.
+    BOT_API_BASE: BOT_API_BASE,
+    TOKEN_PROXY: BOT_API_BASE + "/token",
   };
 
   const DISCORD_AUTHORIZE = "https://discord.com/api/oauth2/authorize";
@@ -60,11 +64,30 @@ const PVAuth = (function () {
   }
 
   /* ----------------------------- storage -------------------------------- */
+  function removeStoredSession() {
+    try {
+      localStorage.removeItem(LS_SESSION);
+    } catch (e) {
+      // Storage can be unavailable in a privacy-restricted browser.
+    }
+  }
+
   function getSession() {
     try {
       const raw = localStorage.getItem(LS_SESSION);
-      return raw ? JSON.parse(raw) : null;
+      const session = raw ? JSON.parse(raw) : null;
+      if (!session || typeof session !== "object") return null;
+
+      // Remove sessions written by the old demo mode. A demo account must
+      // never be treated as an authenticated Discord user.
+      if (session.demo === true || (session.user && session.user.demo === true)) {
+        removeStoredSession();
+        return null;
+      }
+
+      return session;
     } catch (e) {
+      removeStoredSession();
       return null;
     }
   }
@@ -74,7 +97,7 @@ const PVAuth = (function () {
   }
 
   function clearSession() {
-    localStorage.removeItem(LS_SESSION);
+    removeStoredSession();
   }
 
   function isLoggedIn() {
@@ -84,11 +107,6 @@ const PVAuth = (function () {
 
   function getRedirectUri() {
     return new URL(CONFIG.REDIRECT_PATH, location.href).href;
-  }
-
-  function isDemoRequested() {
-    const params = new URLSearchParams(location.search);
-    return CONFIG.DEMO_ENABLED || params.get("demo") === "1";
   }
 
   /* ----------------------------- avatar --------------------------------- */
@@ -112,34 +130,10 @@ const PVAuth = (function () {
     return DISCORD_CDN + "/embed/avatars/" + idx + ".png?size=" + size;
   }
 
-  /* ----------------------------- demo session --------------------------- */
-  function makeDemoSession() {
-    const user = {
-      id: "1000000000000000000",
-      username: "DemoUser",
-      global_name: "Demo User",
-      discriminator: "0001",
-      avatar: null,
-      email: "demo@protect-vmax.example",
-      demo: true,
-    };
-    return {
-      access_token: "demo_access_token",
-      refresh_token: "demo_refresh_token",
-      expires_at: Date.now() + 7 * 864e5,
-      user: user,
-      demo: true,
-    };
-  }
-
   /* ----------------------------- login flow ----------------------------- */
   async function login() {
-    // Not configured yet -> drop the visitor into the demo dashboard so the
-    // UI is still viewable. Replace CLIENT_ID to enable real Discord login.
-    if (CONFIG.CLIENT_ID === "YOUR_DISCORD_CLIENT_ID") {
-      const sep = getRedirectUri().includes("?") ? "&" : "?";
-      location.href = getRedirectUri() + sep + "demo=1&why=config";
-      return;
+    if (!CONFIG.CLIENT_ID || CONFIG.CLIENT_ID === "YOUR_DISCORD_CLIENT_ID") {
+      throw new Error("Discord login is not configured. Set CONFIG.CLIENT_ID in auth.js.");
     }
 
     const verifier = randToken(32);
@@ -209,7 +203,6 @@ const PVAuth = (function () {
   async function getValidToken() {
     const s = getSession();
     if (!s) return null;
-    if (s.demo) return s.access_token;
     if (s.expires_at && Date.now() < s.expires_at - 5000) return s.access_token;
     if (s.refresh_token) {
       const t = await refreshToken(s.refresh_token);
@@ -237,10 +230,10 @@ const PVAuth = (function () {
     const savedState = sessionStorage.getItem(SS_STATE);
     const verifier = sessionStorage.getItem(SS_VERIFIER);
 
-    if (!verifier) {
-      throw new Error("Missing PKCE verifier — please start the login again.");
+    if (!verifier || !savedState || !state) {
+      throw new Error("Login state expired — please start the login again.");
     }
-    if (savedState && state && savedState !== state) {
+    if (savedState !== state) {
       throw new Error("State mismatch (possible CSRF). Please try logging in again.");
     }
 
@@ -252,7 +245,6 @@ const PVAuth = (function () {
       refresh_token: tok.refresh_token,
       expires_at: Date.now() + (tok.expires_in || 604800) * 1000,
       user: user,
-      demo: false,
     };
     setSession(session);
     sessionStorage.removeItem(SS_VERIFIER);
@@ -263,6 +255,8 @@ const PVAuth = (function () {
 
   function logout() {
     clearSession();
+    sessionStorage.removeItem(SS_VERIFIER);
+    sessionStorage.removeItem(SS_STATE);
   }
 
   /* ----------------------------- nav UI --------------------------------- */
@@ -297,7 +291,7 @@ const PVAuth = (function () {
         if (loggedIn) {
           if (sav) sav.src = avatarUrl(s.user) || sav.src;
           if (snm) snm.textContent = s.user.global_name || s.user.username;
-          if (spl) spl.textContent = (s.demo ? "Demo" : "Free") + " plan";
+          if (spl) spl.textContent = "Free plan";
         } else {
           if (sav) sav.src = "";
           if (snm) snm.textContent = "";
@@ -317,7 +311,10 @@ const PVAuth = (function () {
       if (e) e.preventDefault();
       logout();
       render();
-      if (location.pathname.endsWith(CONFIG.REDIRECT_PATH)) {
+      if (
+        location.pathname.endsWith(CONFIG.REDIRECT_PATH) ||
+        location.pathname.endsWith("/dashboard.html")
+      ) {
         location.href = "index.html";
       }
     }
@@ -340,8 +337,6 @@ const PVAuth = (function () {
     handleCallback: handleCallback,
     avatarUrl: avatarUrl,
     initNavAuth: initNavAuth,
-    makeDemoSession: makeDemoSession,
-    isDemoRequested: isDemoRequested,
     getRedirectUri: getRedirectUri,
   };
 })();
