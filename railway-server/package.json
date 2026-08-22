@@ -1,0 +1,13 @@
+{
+  "name": "vmax-host-server",
+  "version": "1.0.0",
+  "description": "Protect-Vmax web + API server (static site + /api/user + /scripts/hosted)",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "start": "node server.mjs"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
