@@ -21,7 +21,7 @@ const PVAuth = (function () {
     CLIENT_ID: "1540626944557850624", // <-- your Discord app's Client ID
     REDIRECT_PATH: "dashboard.html",
     SCOPES: "identify email",
-    TOKEN_PROXY: null, // e.g. "https://my-proxy.example.com/token"
+    TOKEN_PROXY: "/token", // Proxies token exchange via backend to bypass browser CORS
     // Lets visitors open /dashboard.html?demo=1 to preview the UI without a
     // real Discord app. Turn off once CLIENT_ID is set if you don't want it.
     DEMO_ENABLED: true,
