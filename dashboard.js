@@ -18,8 +18,13 @@ const BOT_API_BASE = (
 ).replace(/\/+$/, "");
 
 const CONFIG = {
-  // The Discord bot owns the account, key and script data.
+  // The Discord bot owns the account, key and script data. If that separate
+  // service is temporarily unavailable, getUserData() falls back to this
+  // website's same-origin authenticated account endpoint.
   API_BASE: BOT_API_BASE,
+  API_FALLBACK: window.location && /^https?:$/.test(window.location.protocol)
+    ? window.location.origin
+    : "",
   HOST_BASE: BOT_API_BASE + "/scripts/hosted",
 };
 
@@ -88,6 +93,7 @@ function loaderSnippet(apiKey, hostedUrl) {
 /* ----------------------------- state ----------------------------------- */
 let SESSION = null;
 let VIEW = "dashboard";
+let ACTIVE_API_BASE = null;
 
 /* Build a hosted URL for a script from its apiKey + name (dashboard-side,
    so the loader URL always matches HOST_BASE). */
@@ -119,38 +125,42 @@ function localData(session) {
     scripts: [],
     botOnline: null,
     botTag: "",
+    apiOnline: false,
   };
 }
 
-/* Fetch the authenticated user's data and the bot's live status. */
-async function getUserData(session) {
-  if (!session || !session.user || !session.user.id) {
-    throw new Error("Missing authenticated user");
-  }
+function apiCandidates() {
+  const ordered = [ACTIVE_API_BASE, CONFIG.API_BASE, CONFIG.API_FALLBACK];
+  const seen = new Set();
+  return ordered
+    .map(function (base) { return String(base || "").replace(/\/+$/, ""); })
+    .filter(function (base) {
+      if (!base || seen.has(base)) return false;
+      seen.add(base);
+      return true;
+    });
+}
 
-  const base = (CONFIG.API_BASE || "").replace(/\/+$/, "");
-  const userId = session.user.id;
-  const url = base + "/api/user/" + encodeURIComponent(userId);
+function fetchWithTimeout(url, options, timeoutMs) {
+  if (typeof AbortController === "undefined") return fetch(url, options);
+  const controller = new AbortController();
+  const timer = setTimeout(function () { controller.abort(); }, timeoutMs || 8000);
+  const opts = Object.assign({}, options || {}, { signal: controller.signal });
+  return fetch(url, opts).finally(function () { clearTimeout(timer); });
+}
 
-  let accessToken = session.access_token;
-  if (PV && typeof PV.getValidToken === "function") {
-    accessToken = (await PV.getValidToken()) || accessToken;
-  }
-
-  const headers = {};
-  if (accessToken) {
-    headers["Authorization"] = "Bearer " + accessToken;
-  }
-
+async function fetchUserDataFrom(base, userId, headers, session) {
+  const userUrl = base + "/api/user/" + encodeURIComponent(userId);
   const results = await Promise.all([
-    fetch(url, { headers: headers }),
-    fetch(base + "/api/v1/info", { cache: "no-store" }).catch(function () { return null; }),
+    fetchWithTimeout(userUrl, { headers: headers, cache: "no-store" }, 8000),
+    fetchWithTimeout(base + "/api/v1/info", { cache: "no-store" }, 5000)
+      .catch(function () { return null; }),
   ]);
   const res = results[0];
   const infoRes = results[1];
-  if (!res.ok) throw new Error("HTTP " + res.status);
-  const j = await res.json();
+  if (!res.ok) throw new Error("HTTP " + res.status + " from " + base);
 
+  const j = await res.json();
   let info = null;
   if (infoRes && infoRes.ok) {
     info = await infoRes.json().catch(function () { return null; });
@@ -166,7 +176,41 @@ async function getUserData(session) {
       : [],
     botOnline: info ? info.bot_online === true : null,
     botTag: info && info.bot_tag ? info.bot_tag : "",
+    apiOnline: true,
   };
+}
+
+/* Fetch the authenticated user's data and the bot's live status. */
+async function getUserData(session) {
+  if (!session || !session.user || !session.user.id) {
+    throw new Error("Missing authenticated user");
+  }
+
+  const userId = session.user.id;
+  let accessToken = session.access_token;
+  if (PV && typeof PV.getValidToken === "function") {
+    accessToken = (await PV.getValidToken()) || accessToken;
+  }
+
+  const headers = {};
+  if (accessToken) headers["Authorization"] = "Bearer " + accessToken;
+
+  const bases = apiCandidates();
+  let lastError = null;
+  for (let i = 0; i < bases.length; i++) {
+    try {
+      const data = await fetchUserDataFrom(bases[i], userId, headers, session);
+      ACTIVE_API_BASE = bases[i];
+      return data;
+    } catch (e) {
+      lastError = e;
+      // If a previously selected service stopped working, allow the fallback
+      // candidates to be tried and re-selected.
+      if (ACTIVE_API_BASE === bases[i]) ACTIVE_API_BASE = null;
+    }
+  }
+
+  throw lastError || new Error("No account API is configured");
 }
 
 /* ----------------------------- shared bits ----------------------------- */

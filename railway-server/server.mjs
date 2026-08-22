@@ -35,6 +35,12 @@ const PORT = process.env.PORT || 3000;
 const HOST_BASE = process.env.HOST_BASE || "https://vmax-host.up.railway.app/scripts/hosted";
 const DISCORD_API = "https://discord.com/api";
 const DISCORD_TOKEN = "https://discord.com/api/oauth2/token";
+const DISCORD_CLIENT_ID = (
+  process.env.DISCORD_CLIENT_ID ||
+  process.env.CLIENT_ID ||
+  "1540626944557850624"
+).trim();
+const DISCORD_CLIENT_SECRET = (process.env.DISCORD_CLIENT_SECRET || "").trim();
 
 /* ---------------------- data stores (REPLACE WITH REAL DB) -------------- *
  * In-memory for now. Wire these to your real database / Discord bot:
@@ -125,21 +131,41 @@ function sendText(res, status, text, type) {
   res.end(text);
 }
 
-/* The browser uses this same-origin route for the PKCE token exchange. */
+/* The browser uses this same-origin route for the PKCE token exchange.
+   If this Discord application is a confidential OAuth client, Railway can
+   provide DISCORD_CLIENT_SECRET and this server adds it without ever exposing
+   the secret to browser JavaScript. Public OAuth clients continue to work
+   with PKCE when that variable is not set. */
 async function handleTokenProxy(req, res) {
   let body = "";
   try {
     for await (const chunk of req) {
       body += chunk;
       if (body.length > 64 * 1024) {
-        return sendJSON(res, 413, { error: "request too large" });
+        return sendJSON(res, 413, { error: "request_too_large" });
       }
+    }
+
+    const params = new URLSearchParams(body);
+    const requestedClientId = params.get("client_id") || DISCORD_CLIENT_ID;
+    if (!requestedClientId || requestedClientId !== DISCORD_CLIENT_ID) {
+      return sendJSON(res, 400, {
+        error: "invalid_client",
+        error_description: "OAuth client ID does not match this website.",
+      });
+    }
+    params.set("client_id", DISCORD_CLIENT_ID);
+    if (DISCORD_CLIENT_SECRET) {
+      params.set("client_secret", DISCORD_CLIENT_SECRET);
+    } else {
+      // Never forward a client secret supplied by an untrusted browser.
+      params.delete("client_secret");
     }
 
     const upstream = await fetch(DISCORD_TOKEN, {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body,
+      body: params.toString(),
     });
     const text = await upstream.text();
     setCommon(
@@ -149,7 +175,10 @@ async function handleTokenProxy(req, res) {
     );
     res.end(text);
   } catch (err) {
-    sendJSON(res, 502, { error: "token_proxy_failed", detail: String(err) });
+    sendJSON(res, 502, {
+      error: "token_proxy_failed",
+      error_description: "Could not reach Discord's login service.",
+    });
   }
 }
 

@@ -1,8 +1,9 @@
 /* ==========================================================================
    Protect-Vmax — auth.js
    Discord login via OAuth 2.0 Authorization Code flow + PKCE.
-   Works entirely client-side (no client secret needed) and stores the
-   session in localStorage. Also powers the nav login chip on every page.
+   Uses the website's same-origin /token endpoint for the code exchange and
+   stores the session in localStorage. Also powers the nav login chip on
+   every page.
    ========================================================================== */
 
 const PVAuth = (function () {
@@ -14,8 +15,8 @@ const PVAuth = (function () {
                          (Discord Developer Portal -> Application -> OAuth2)
        2. In the Developer Portal, add this site's dashboard route as a
           Redirect:  <your-site>/dashboard   (must match exactly)
-       3. BOT_API_BASE -> the public URL of the connected Discord bot
-          service. It must expose POST /token and the dashboard API.
+       3. BOT_API_BASE -> the public URL of the connected Discord bot API.
+          OAuth itself uses this website's same-origin POST /token route.
      ---------------------------------------------------------------------- */
   const BOT_API_BASE = "https://discord-project-production-a058.up.railway.app";
 
@@ -25,10 +26,12 @@ const PVAuth = (function () {
     // dashboard.html behind the scenes.
     REDIRECT_PATH: "/dashboard",
     SCOPES: "identify email",
-    // Use the real bot service for the OAuth token exchange. It already
-    // exposes POST /token with CORS enabled.
     BOT_API_BASE: BOT_API_BASE,
-    TOKEN_PROXY: BOT_API_BASE + "/token",
+    // OAuth must not depend on the separate bot domain. That domain can be
+    // asleep, renamed, or temporarily unprovisioned while this site is still
+    // healthy. The Website-Vmax Railway server exposes this same-origin route
+    // and safely performs the Discord token exchange.
+    TOKEN_PROXY: "/token",
   };
 
   const DISCORD_AUTHORIZE = "https://discord.com/api/oauth2/authorize";
@@ -93,7 +96,13 @@ const PVAuth = (function () {
   }
 
   function setSession(obj) {
-    localStorage.setItem(LS_SESSION, JSON.stringify(obj));
+    try {
+      localStorage.setItem(LS_SESSION, JSON.stringify(obj));
+    } catch (e) {
+      throw new Error(
+        "Your browser blocked local storage. Allow site storage, then try logging in again."
+      );
+    }
   }
 
   function clearSession() {
@@ -157,6 +166,68 @@ const PVAuth = (function () {
   }
 
   /* ----------------------------- token exchange ------------------------- */
+  function oauthErrorMessage(status, text, action) {
+    let detail = "";
+    try {
+      const parsed = JSON.parse(text);
+      detail = parsed.error_description || parsed.message || parsed.error || "";
+    } catch (e) {
+      // Never put a proxy's full HTML error page into the dashboard.
+      detail = "";
+    }
+
+    if (status === 404 || status === 405) {
+      return "The website login service is not available yet. Please redeploy Website-Vmax and try again.";
+    }
+    if (/invalid_grant/i.test(detail)) {
+      return "Discord rejected this expired or already-used login. Please start a new login.";
+    }
+    if (/invalid_client/i.test(detail)) {
+      return "Discord OAuth is not configured on the server. Check the Discord client settings.";
+    }
+    return action + " failed (HTTP " + status + ")" + (detail ? ": " + detail : ".");
+  }
+
+  async function requestToken(body, action) {
+    const controller = typeof AbortController !== "undefined" ? new AbortController() : null;
+    const timer = controller
+      ? setTimeout(function () { controller.abort(); }, 15000)
+      : null;
+
+    let res;
+    try {
+      res = await fetch(CONFIG.TOKEN_PROXY || DISCORD_TOKEN, {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: body.toString(),
+        signal: controller ? controller.signal : undefined,
+      });
+    } catch (e) {
+      if (e && e.name === "AbortError") {
+        throw new Error("The website login service timed out. Please try again.");
+      }
+      throw new Error("The website login service could not be reached. Please try again.");
+    } finally {
+      if (timer) clearTimeout(timer);
+    }
+
+    const text = await res.text().catch(function () { return ""; });
+    if (!res.ok) {
+      throw new Error(oauthErrorMessage(res.status, text, action));
+    }
+
+    let token;
+    try {
+      token = JSON.parse(text);
+    } catch (e) {
+      throw new Error("The website login service returned an invalid response.");
+    }
+    if (!token || !token.access_token) {
+      throw new Error("Discord did not return an access token. Please log in again.");
+    }
+    return token;
+  }
+
   async function exchangeCode(code, verifier) {
     const body = new URLSearchParams({
       client_id: CONFIG.CLIENT_ID,
@@ -165,16 +236,7 @@ const PVAuth = (function () {
       redirect_uri: getRedirectUri(),
       code_verifier: verifier,
     });
-    const res = await fetch(CONFIG.TOKEN_PROXY || DISCORD_TOKEN, {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: body.toString(),
-    });
-    if (!res.ok) {
-      const txt = await res.text().catch(function () { return ""; });
-      throw new Error("Token exchange failed (" + res.status + "): " + txt);
-    }
-    return res.json();
+    return requestToken(body, "Discord login");
   }
 
   async function refreshToken(refresh_token) {
@@ -183,13 +245,7 @@ const PVAuth = (function () {
       grant_type: "refresh_token",
       refresh_token: refresh_token,
     });
-    const res = await fetch(CONFIG.TOKEN_PROXY || DISCORD_TOKEN, {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: body.toString(),
-    });
-    if (!res.ok) throw new Error("Token refresh failed (" + res.status + ")");
-    return res.json();
+    return requestToken(body, "Discord session refresh");
   }
 
   async function fetchUser(accessToken) {
@@ -250,6 +306,7 @@ const PVAuth = (function () {
     sessionStorage.removeItem(SS_VERIFIER);
     sessionStorage.removeItem(SS_STATE);
     history.replaceState(null, "", location.pathname);
+    window.dispatchEvent(new Event("pv:auth-changed"));
     return true;
   }
 
@@ -324,6 +381,9 @@ const PVAuth = (function () {
     const slo = document.getElementById("side-logout");
     if (slo) slo.addEventListener("click", doLogout);
 
+    // The OAuth callback is handled by dashboard.js after DOMContentLoaded.
+    // Refresh the sidebar as soon as that callback stores the real user.
+    window.addEventListener("pv:auth-changed", render);
     render();
   }
 
