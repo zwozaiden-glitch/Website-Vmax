@@ -7,17 +7,20 @@
 const PV = window.PVAuth;
 
 /* ==========================================================================
-   CONFIG — connect the dashboard to your backend.
-   API_BASE : your Railway (or other) public URL that serves the JSON API.
-              Leave "" to keep the local empty/zero state (no fake data).
-              Example: "https://discord-project-production-a058.up.railway.app"
-   HOST_BASE: where hosted .lua files live (used to build loader URLs).
-              Use YOUR short custom domain in production, e.g.
-              "https://vmax.dev/s"  ->  loader: loadstring(game:HttpGet("https://vmax.dev/s/<hash>"))()
+   CONFIG — the Discord bot is the dashboard's backend.
+   API_BASE : bot service URL for account, key and script data.
+   HOST_BASE: bot service URL for hosted protected scripts.
    ========================================================================== */
+const BOT_API_BASE = (
+  window.PVAuth && window.PVAuth.CONFIG && window.PVAuth.CONFIG.BOT_API_BASE
+    ? window.PVAuth.CONFIG.BOT_API_BASE
+    : "https://discord-project-production-a058.up.railway.app"
+).replace(/\/+$/, "");
+
 const CONFIG = {
-  API_BASE: "",
-  HOST_BASE: window.location.origin + "/scripts/hosted",
+  // The Discord bot owns the account, key and script data.
+  API_BASE: BOT_API_BASE,
+  HOST_BASE: BOT_API_BASE + "/scripts/hosted",
 };
 
 /* These links are presentation-only. Account data always comes from the API. */
@@ -114,10 +117,12 @@ function localData(session) {
     apiKey: apiKey,
     plan: "Free",
     scripts: [],
+    botOnline: null,
+    botTag: "",
   };
 }
 
-/* Fetch real data from your Railway API. Falls back to an empty state on failure. */
+/* Fetch the authenticated user's data and the bot's live status. */
 async function getUserData(session) {
   if (!session || !session.user || !session.user.id) {
     throw new Error("Missing authenticated user");
@@ -125,16 +130,31 @@ async function getUserData(session) {
 
   const base = (CONFIG.API_BASE || "").replace(/\/+$/, "");
   const userId = session.user.id;
-  const url = (base ? base : "") + "/api/user/" + encodeURIComponent(userId);
+  const url = base + "/api/user/" + encodeURIComponent(userId);
 
-  const headers = {};
-  if (session && session.access_token) {
-    headers["Authorization"] = "Bearer " + session.access_token;
+  let accessToken = session.access_token;
+  if (PV && typeof PV.getValidToken === "function") {
+    accessToken = (await PV.getValidToken()) || accessToken;
   }
 
-  const res = await fetch(url, { headers: headers });
+  const headers = {};
+  if (accessToken) {
+    headers["Authorization"] = "Bearer " + accessToken;
+  }
+
+  const results = await Promise.all([
+    fetch(url, { headers: headers }),
+    fetch(base + "/api/v1/info", { cache: "no-store" }).catch(function () { return null; }),
+  ]);
+  const res = results[0];
+  const infoRes = results[1];
   if (!res.ok) throw new Error("HTTP " + res.status);
   const j = await res.json();
+
+  let info = null;
+  if (infoRes && infoRes.ok) {
+    info = await infoRes.json().catch(function () { return null; });
+  }
 
   const apiKey = j.apiKey || deriveApiKey(session.user);
   return {
@@ -144,6 +164,8 @@ async function getUserData(session) {
     scripts: Array.isArray(j.scripts)
       ? j.scripts.map(function (s) { return normalizeScript(s, apiKey); })
       : [],
+    botOnline: info ? info.bot_online === true : null,
+    botTag: info && info.bot_tag ? info.bot_tag : "",
   };
 }
 
@@ -155,6 +177,17 @@ function statusPill(status) {
   };
   const label = map[status] || status;
   return '<span class="status status-' + status + '">' + label + "</span>";
+}
+
+function botConnection(d) {
+  if (d.botOnline === true) {
+    const name = d.botTag ? " · " + escapeHtml(d.botTag) : "";
+    return '<span class="conn on">Bot ✓' + name + "</span>";
+  }
+  if (d.botOnline === false) {
+    return '<span class="conn">Bot offline</span>';
+  }
+  return '<span class="conn">Bot status unavailable</span>';
 }
 
 function toast(message) {
@@ -229,7 +262,7 @@ function viewDashboard(d) {
           "</div>" +
           '<div class="conn-row">' +
             '<span class="conn on">Discord ✓</span>' +
-            '<span class="conn on">Bot ✓</span>' +
+            botConnection(d) +
             '<span class="conn on">Hosting ✓</span>' +
           "</div>" +
         "</div>" +
@@ -328,7 +361,7 @@ function viewKeys(d) {
           "</div>" +
           '<div class="conn-row">' +
             '<span class="conn on">Discord ✓</span>' +
-            '<span class="conn on">Bot ✓</span>' +
+            botConnection(d) +
             '<span class="conn on">Hosting ✓</span>' +
           "</div>" +
         "</div>" +
@@ -365,9 +398,15 @@ function viewBot(d) {
           '<div class="card-head"><h3>Connection</h3></div>' +
           '<div class="conn-row">' +
             '<span class="conn on">Discord ✓</span>' +
-            '<span class="conn on">Bot ✓</span>' +
+            botConnection(d) +
           "</div>" +
-          '<p class="muted small mt">Your account is linked through your Discord login, so the bot already knows your API key.</p>' +
+          '<p class="muted small mt">' +
+            (d.botOnline === true
+              ? "Connected to " + escapeHtml(d.botTag || "the Protect-Vmax bot") + ". Your account data is coming from the bot."
+              : d.botOnline === false
+                ? "The bot service responded, but the Discord bot is currently offline."
+                : "The bot status could not be checked right now.") +
+          "</p>" +
           '<div class="gate-actions mt">' +
             '<a class="btn btn-primary btn-sm" href="' + DASHBOARD_LINKS.discordInvite + '" target="_blank" rel="noopener">Invite bot</a>' +
             '<a class="btn btn-ghost btn-sm" href="' + DASHBOARD_LINKS.ticketUrl + '" target="_blank" rel="noopener">Need help</a>' +

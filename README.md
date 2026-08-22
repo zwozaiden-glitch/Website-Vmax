@@ -23,18 +23,15 @@ The site uses the **Authorization Code + PKCE** flow so it works without a serve
 
 That's it — clicking **Log in** starts the flow and Discord redirects back to `/dashboard`, which serves `dashboard.html` and fetches the user.
 
-### CORS note
+### Bot connection
 
-The recommended `railway-server/server.mjs` exposes a same-origin `POST /token` proxy for the PKCE exchange, which is the default configured in `auth.js`. If the static site is deployed separately, run the included proxy and point `TOKEN_PROXY` at its public URL:
+This frontend is connected to the `discord-project` bot service. `auth.js` sends the PKCE token exchange to the bot's `POST /token` endpoint, and `dashboard.js` reads account data, scripts and live bot status from the bot API:
 
-```bash
-node auth-proxy/server.mjs          # listens on http://localhost:3000/token
+```text
+https://discord-project-production-a058.up.railway.app
 ```
 
-```js
-// in auth.js
-const CONFIG = { /* ... */ TOKEN_PROXY: "https://your-auth-proxy.example/token" };
-```
+If you move the bot to another Railway domain, update `BOT_API_BASE` in `auth.js`. The bot service must allow CORS for the website origin.
 
 ## Connect the dashboard to your backend (Netlify + Railway)
 
@@ -44,11 +41,8 @@ The site is static; your Railway service is the API. They are **different origin
    `https://vmax-host.up.railway.app/dashboard`
    (auth.js derives the redirect URI automatically from the live origin, so just register whatever domain the site actually runs on.)
 2. **`auth.js`** — set `CONFIG.CLIENT_ID` to your Discord app's Client ID. The redirect URI is the live site's `/dashboard` path.
-3. **`dashboard.js` → `CONFIG.API_BASE`** — set it to your Railway public URL, e.g.
-   `"https://discord-project-production-a058.up.railway.app"`. Leave `""` to keep the local empty/zero state. `HOST_BASE` is where hosted `.lua` files live (use your short custom domain in prod, e.g. `https://vmax.dev/s`).
-4. **Railway CORS** — only needed if the static site lives on a **different origin** than the API. Allow the site's origin, e.g.
-   `Access-Control-Allow-Origin: <your-static-site-domain>` (and handle `OPTIONS` preflight).
-   *(Skip CORS entirely if you serve the static files from the same Railway service/origin as the API.)*
+3. **Bot API** — `dashboard.js` uses the `BOT_API_BASE` from `auth.js` for account data, scripts, hosted loaders and `/api/v1/info` bot status. Keep it pointed at the deployed `discord-project` Railway service.
+4. **Railway CORS** — the bot service must allow requests from the Website-Vmax origin and handle `OPTIONS` preflight. The current bot API responds with `Access-Control-Allow-Origin: *`.
 
 ### API contract the dashboard expects
 - `GET /api/user/:discordId` (Authorization: `Bearer <access_token>`) →
@@ -91,4 +85,4 @@ Steps:
 4. In `server.mjs`, start your Discord bot in the same process and call
    `registerScript(discordId, name, luaSource, opts)` from your `/setup` (or equivalent) command so generated scripts appear in the dashboard.
 
-`HOST_BASE` / `PORT` / `STATIC_DIR` can be overridden with environment variables (see the file header). For the browser→Discord token exchange, if you hit CORS, run `auth-proxy/server.mjs` and set `CONFIG.TOKEN_PROXY` in `auth.js`.
+`HOST_BASE` / `PORT` / `STATIC_DIR` can be overridden with environment variables (see the file header). The frontend's `BOT_API_BASE` and `TOKEN_PROXY` should point to the same deployed `discord-project` service.
