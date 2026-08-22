@@ -574,7 +574,7 @@ function errorScreen(message) {
         "<h1>Something went wrong</h1>" +
         '<p class="gate-note">' + escapeHtml(message) + "</p>" +
         '<div class="gate-actions">' +
-          '<a class="btn btn-primary btn-lg" href="dashboard.html">Try again</a>' +
+          '<a class="btn btn-primary btn-lg" href="/dashboard">Try again</a>' +
           '<a class="btn btn-ghost btn-lg" href="index.html">Back to site</a>' +
         "</div>" +
       "</div>" +

@@ -12,16 +12,16 @@ const PVAuth = (function () {
      CONFIG — the ONLY things you need to change for real Discord login:
        1. CLIENT_ID  -> your Discord application's Client ID
                          (Discord Developer Portal -> Application -> OAuth2)
-       2. In the Developer Portal, add this site's dashboard page as a
-          Redirect:  <your-site>/dashboard.html   (must match exactly)
+       2. In the Developer Portal, add this site's dashboard route as a
+          Redirect:  <your-site>/dashboard   (must match exactly)
        3. (optional) TOKEN_PROXY -> set this if your browser blocks the
           direct token exchange with CORS. See auth-proxy/server.mjs.
      ---------------------------------------------------------------------- */
   const CONFIG = {
     CLIENT_ID: "1540626944557850624", // <-- your Discord app's Client ID
-    // Use the real file served by the site. /dashboard is not a valid static
-    // route and caused Discord to redirect to a 404 page.
-    REDIRECT_PATH: "/dashboard.html",
+    // /dashboard is the public route; the Railway server serves it with
+    // dashboard.html behind the scenes.
+    REDIRECT_PATH: "/dashboard",
     SCOPES: "identify email",
     // The Railway host exposes this same-origin proxy. Set this to an
     // absolute URL if the static site and proxy are deployed separately.
@@ -308,7 +308,10 @@ const PVAuth = (function () {
       if (e) e.preventDefault();
       logout();
       render();
-      if (location.pathname.endsWith(CONFIG.REDIRECT_PATH)) {
+      if (
+        location.pathname.endsWith(CONFIG.REDIRECT_PATH) ||
+        location.pathname.endsWith("/dashboard.html")
+      ) {
         location.href = "index.html";
       }
     }

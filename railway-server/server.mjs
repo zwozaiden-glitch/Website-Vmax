@@ -19,7 +19,7 @@
        If you put server.mjs at the service root instead, set
        STATIC_DIR=. (env) — see below.
      - Register the Discord redirect URI:
-       https://vmax-host.up.railway.app/dashboard.html
+       https://vmax-host.up.railway.app/dashboard
    ========================================================================== */
 
 import http from "node:http";
@@ -227,6 +227,9 @@ const server = http.createServer(function (req, res) {
     if (req.method !== "POST") return sendJSON(res, 405, { error: "method_not_allowed" });
     return handleTokenProxy(req, res);
   }
+  // Keep the public /dashboard URL in sync with the Discord redirect URI;
+  // the actual static file remains dashboard.html.
+  if (pathname === "/dashboard") return serveStatic(res, "/dashboard.html");
   if (pathname.startsWith("/api/user/")) {
     const id = pathname.slice("/api/user/".length).split("/")[0];
     return handleUser(req, res, id);
