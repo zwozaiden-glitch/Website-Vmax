@@ -1,6 +1,6 @@
 /* ==========================================================================
    Protect-Vmax — script.js
-   All interactivity for index.html AND dashboard.html:
+   All interactivity for index.html:
    Discord links, Luau code sample + copy, scroll reveal, mobile menu,
    FAQ accordion, keydrop countdown, nav state, footer year.
    ========================================================================== */
@@ -18,12 +18,6 @@
    SCRIPT_NAME     -> the script name you registered with /setup (e.g. "luasnapper")
    LOADER_PATH     -> the endpoint the short loadstring loader fetches
                       (e.g. "/api/v1/load")
-   DASHBOARD_URL   -> your web dashboard URL (bot host + /dashboard)
-   DISCORD_CLIENT_ID -> your Discord OAuth app's Client ID (Developer Portal ->
-                      your app -> OAuth2). Used to build the "Login with Discord" URL.
-   DISCORD_OAUTH_REDIRECT -> where Discord sends users after login. Must match a
-                      redirect URI registered in your OAuth app, and your bot must
-                      handle the OAuth callback there (e.g. host + "/callback").
    DISCORD_TICKET_URL -> where the pricing "buy" buttons link. Point this at your
                       ticket channel invite or ticket-bot link.
    PRICING         -> reference only; also update the prices in index.html
@@ -34,42 +28,15 @@ const API_HOST = "https://discord-project-production-a058.up.railway.app";
 const API_TOKEN = "A2F7o-nCC04ed2SrUMftZmXQJ37qvvEn";
 const SCRIPT_NAME = "Vmax";
 const LOADER_PATH = "/api/v1/load";
-const DASHBOARD_URL = "https://discord-project-production-cc27.up.railway.app/dashboard";
-const DISCORD_CLIENT_ID = "1540626944557850624";
-const DISCORD_OAUTH_REDIRECT = "https://discord-project-production-a058.up.railway.app/callback";
 const DISCORD_TICKET_URL = "https://discord.gg/xFeX95Evce";
 const PRICING = { starter: "Free", enjoy: "$2/mo", vmax: "$5/mo" };
 const KEYDROP_SECONDS = 12; // length of the demo keydrop countdown
 
-/* ✏️ Email + password login (login.html).
-   Change these to whatever email/password you want people to log in with.
-   NOTE: this is a static site, so the check happens in the browser —
-   it's a simple gate for the dashboard, not real server-side security. */
-const LOGIN_EMAIL = "admin@vmax.dev";
-const LOGIN_PASSWORD = "vmax123";
-const LOGIN_HINT = true; // set to false to hide the demo-credentials hint box
-
-// Built from the values above — the standard Discord OAuth2 authorize URL.
-const DISCORD_LOGIN_URL =
-  "https://discord.com/oauth2/authorize" +
-  "?client_id=" + DISCORD_CLIENT_ID +
-  "&response_type=code" +
-  "&redirect_uri=" + encodeURIComponent(DISCORD_OAUTH_REDIRECT) +
-  "&scope=identify%20guilds%20email";
-
 /* ==========================================================================
-   1. Link wiring (safe on both pages)
+   1. Link wiring
    ========================================================================== */
 document.querySelectorAll("[data-discord]").forEach(function (a) {
   a.href = DISCORD_INVITE;
-});
-
-document.querySelectorAll("[data-discord-login]").forEach(function (a) {
-  a.href = DISCORD_LOGIN_URL;
-});
-
-document.querySelectorAll("[data-dashboard]").forEach(function (a) {
-  a.href = DASHBOARD_URL;
 });
 
 document.querySelectorAll("[data-ticket]").forEach(function (a) {
@@ -311,134 +278,4 @@ const yearEl = document.getElementById("year");
 if (yearEl) {
   yearEl.textContent = new Date().getFullYear();
 }
-
-/* ==========================================================================
-   9. Email + password login (login.html + dashboard gating)
-   ========================================================================== */
-const LOGIN_SESSION_KEY = "vmax_session";
-
-function getLoginSession() {
-  try {
-    return JSON.parse(localStorage.getItem(LOGIN_SESSION_KEY));
-  } catch (e) {
-    return null;
-  }
-}
-
-function isLoggedIn() {
-  const s = getLoginSession();
-  return !!(s && s.email);
-}
-
-function logout() {
-  try {
-    localStorage.removeItem(LOGIN_SESSION_KEY);
-  } catch (e) {
-    /* ignore */
-  }
-  window.location.href = "login.html";
-}
-
-/* --- Login page wiring ---------------------------------------------------- */
-const loginForm = document.getElementById("login-form");
-
-if (loginForm) {
-  // Already logged in? Straight to the dashboard.
-  if (isLoggedIn()) {
-    window.location.replace("dashboard.html");
-  }
-
-  const emailInput = document.getElementById("login-email");
-  const passwordInput = document.getElementById("login-password");
-  const errorEl = document.getElementById("login-error");
-  const submitBtn = document.getElementById("login-submit");
-  const pwToggle = document.getElementById("pw-toggle");
-
-  // Demo-credentials hint (filled from the config, or hidden).
-  const hintBox = document.getElementById("login-hint");
-  if (hintBox) {
-    if (LOGIN_HINT) {
-      document.getElementById("hint-email").textContent = LOGIN_EMAIL;
-      document.getElementById("hint-password").textContent = LOGIN_PASSWORD;
-    } else {
-      hintBox.hidden = true;
-    }
-  }
-
-  // Show / hide password.
-  if (pwToggle) {
-    pwToggle.addEventListener("click", function () {
-      const show = passwordInput.type === "password";
-      passwordInput.type = show ? "text" : "password";
-      pwToggle.classList.toggle("showing", show);
-      pwToggle.setAttribute("aria-pressed", String(show));
-      pwToggle.setAttribute("aria-label", show ? "Hide password" : "Show password");
-      passwordInput.focus();
-    });
-  }
-
-  function showError(message) {
-    if (!errorEl) return;
-    errorEl.textContent = message;
-    errorEl.hidden = false;
-    errorEl.classList.remove("shake");
-    // restart the shake animation
-    void errorEl.offsetWidth;
-    errorEl.classList.add("shake");
-  }
-
-  loginForm.addEventListener("submit", function (event) {
-    event.preventDefault();
-
-    const email = (emailInput.value || "").trim().toLowerCase();
-    const password = passwordInput.value || "";
-
-    if (!email || !password) {
-      showError("Please enter both your email and password.");
-      return;
-    }
-
-    if (email !== LOGIN_EMAIL.toLowerCase() || password !== LOGIN_PASSWORD) {
-      showError("Wrong email or password. Try again.");
-      passwordInput.value = "";
-      passwordInput.focus();
-      return;
-    }
-
-    // Success — remember the session and open the dashboard.
-    submitBtn.disabled = true;
-    submitBtn.textContent = "Logging in…";
-    try {
-      localStorage.setItem(
-        LOGIN_SESSION_KEY,
-        JSON.stringify({ email: LOGIN_EMAIL, at: Date.now() })
-      );
-    } catch (e) {
-      /* ignore — login still proceeds for this visit */
-    }
-    window.location.href = "dashboard.html";
-  });
-}
-
-/* --- Dashboard gating ------------------------------------------------------ */
-// dashboard.html has data-protected on <body>: no session -> back to login.
-if (document.body.hasAttribute("data-protected") && !isLoggedIn()) {
-  window.location.replace("login.html");
-}
-
-/* --- Nav auth button (shows Login / Log out depending on session) ---------- */
-document.querySelectorAll("[data-auth-cta]").forEach(function (el) {
-  if (isLoggedIn()) {
-    el.textContent = "Log out";
-    el.removeAttribute("href");
-    el.style.cursor = "pointer";
-    el.addEventListener("click", function (event) {
-      event.preventDefault();
-      logout();
-    });
-  } else {
-    el.textContent = "Login";
-    el.setAttribute("href", "login.html");
-  }
-});
 

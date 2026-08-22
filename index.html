@@ -19,14 +19,8 @@
                               (example used here: "luasnapper")
       LOADER_PATH          -> the endpoint the short loadstring loader fetches
                               (example used here: "/api/v1/load")
-      DASHBOARD_URL        -> your web dashboard URL (bot host + /dashboard)
-      DISCORD_CLIENT_ID    -> your Discord OAuth app's client ID (used for login)
-      DISCORD_OAUTH_REDIRECT -> where Discord returns after login (bot host + /callback)
       DISCORD_TICKET_URL   -> where the "buy" buttons link (your ticket channel / bot link)
       PRICING              -> the Free / Enjoy / Vmax prices (edit the cards below)
-
-      NOTE: the Dashboard now has its own page — see dashboard.html
-      (nav + footer link there; prices live in the pricing cards below).
     ============================================================
   -->
   <meta charset="UTF-8" />
@@ -71,10 +65,8 @@
         <a href="#features">Features</a>
         <a href="#how-it-works">How it works</a>
         <a href="#api">API</a>
-        <a href="dashboard.html">Dashboard</a>
         <a href="#pricing">Pricing</a>
         <a href="#faq">FAQ</a>
-        <a class="btn btn-primary btn-sm nav-cta" href="login.html" data-auth-cta>Login</a>
       </nav>
 
       <button class="hamburger" id="hamburger" aria-label="Toggle menu" aria-expanded="false" aria-controls="nav-links">
@@ -109,8 +101,8 @@
           </p>
 
           <div class="hero-cta reveal">
-            <a class="btn btn-primary" href="login.html">
-              Login
+            <a class="btn btn-primary" href="#" data-ticket target="_blank" rel="noopener">
+              Get started
             </a>
             <a class="btn btn-ghost" href="#" data-discord target="_blank" rel="noopener">
               Join our Discord
@@ -334,7 +326,7 @@
               <li>Full validation API</li>
               <li>Community support</li>
             </ul>
-            <a class="btn btn-ghost btn-block" href="login.html">Get started free</a>
+            <a class="btn btn-ghost btn-block" href="#" data-discord target="_blank" rel="noopener">Get started free</a>
           </article>
 
           <article class="price-card glass reveal">
@@ -444,10 +436,10 @@
       <div class="container">
         <div class="cta-box reveal">
           <h2>Ready to protect your scripts?</h2>
-          <p>Log in with your email and password, open your dashboard, and lock your first key in minutes.</p>
+          <p>Join our Discord, create a ticket, and lock your first key in minutes.</p>
           <div class="cta-actions">
-            <a class="btn btn-primary btn-lg" href="login.html">Login</a>
-            <a class="btn btn-ghost btn-lg" href="#" data-discord target="_blank" rel="noopener">Join our Discord</a>
+            <a class="btn btn-primary btn-lg" href="#" data-discord target="_blank" rel="noopener">Join our Discord</a>
+            <a class="btn btn-ghost btn-lg" href="#" data-ticket target="_blank" rel="noopener">Create a ticket</a>
           </div>
         </div>
       </div>
@@ -477,7 +469,6 @@
           <a href="#features">Features</a>
           <a href="#how-it-works">How it works</a>
           <a href="#api">API</a>
-          <a href="dashboard.html">Dashboard</a>
           <a href="#pricing">Pricing</a>
         </div>
         <div class="footer-col">
