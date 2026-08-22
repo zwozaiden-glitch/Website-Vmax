@@ -32,10 +32,10 @@
 const DISCORD_INVITE = "https://discord.gg/xFeX95Evce";
 const API_HOST = "https://discord-project-production-cc27.up.railway.app";
 const API_TOKEN = "YOUR_API_TOKEN";
-const SCRIPT_NAME = "luasnapper";
+const SCRIPT_NAME = "Vmax";
 const LOADER_PATH = "/api/v1/load";
 const DASHBOARD_URL = "https://discord-project-production-cc27.up.railway.app/dashboard";
-const DISCORD_CLIENT_ID = "YOUR_DISCORD_CLIENT_ID";
+const DISCORD_CLIENT_ID = "1540626944557850624";
 const DISCORD_OAUTH_REDIRECT = "https://discord-project-production-cc27.up.railway.app/callback";
 const DISCORD_TICKET_URL = "https://discord.gg/xFeX95Evce";
 const PRICING = { starter: "Free", enjoy: "$2/mo", vmax: "$5/mo" };
