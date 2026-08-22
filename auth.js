@@ -19,7 +19,7 @@ const PVAuth = (function () {
      ---------------------------------------------------------------------- */
   const CONFIG = {
     CLIENT_ID: "1540626944557850624", // <-- your Discord app's Client ID
-    REDIRECT_PATH: "dashboard.html",
+    REDIRECT_PATH: "https://vmax-host.up.railway.app/dashboard",
     SCOPES: "identify email",
     TOKEN_PROXY: "/token", // Proxies token exchange via backend to bypass browser CORS
     // Lets visitors open /dashboard.html?demo=1 to preview the UI without a
