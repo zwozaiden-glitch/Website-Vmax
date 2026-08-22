@@ -75,3 +75,22 @@ The site is static; your Railway service is the API. They are **different origin
 
 - Dashboard data in `dashboard.js` (`MOCK`) is placeholder content — wire it to your real Protect-Vmax API.
 - The static site has no backend; the API host / token used by the loader live in `script.js`.
+
+## Deploy to `vmax-host` (same-origin, recommended)
+
+`railway-server/server.mjs` is a **zero-dependency Node server** that runs your whole site + API on the same origin (no CORS). It:
+
+- serves the static files (`index.html`, `dashboard.html`, `*.js/css/svg`),
+- `GET /api/user/:discordId` — verifies the Discord `Bearer` token (calls Discord `/users/@me`), then returns `{ apiKey, plan, scripts }`,
+- `GET /scripts/hosted/<hash>.lua` — returns the raw `.lua` the loader fetches,
+- `GET /healthz` — health check.
+
+Steps:
+
+1. Copy the `railway-server/` folder into your `vmax-host` Railway service, next to `index.html` / `dashboard.html`.
+2. Set the service **start command** to `node railway-server/server.mjs` (Railway provides `PORT`).
+3. Register the Discord redirect URI: `https://vmax-host.up.railway.app/dashboard.html`.
+4. In `server.mjs`, start your Discord bot in the same process and call
+   `registerScript(discordId, name, luaSource, opts)` from your `/setup` (or equivalent) command so generated scripts appear in the dashboard.
+
+`HOST_BASE` / `PORT` / `STATIC_DIR` can be overridden with environment variables (see the file header). For the browser→Discord token exchange, if you hit CORS, run `auth-proxy/server.mjs` and set `CONFIG.TOKEN_PROXY` in `auth.js`.
