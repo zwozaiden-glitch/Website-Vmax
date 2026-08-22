@@ -2,7 +2,6 @@
    Protect-Vmax — dashboard.js
    Sidebar dashboard. Each Discord user gets their own API key that hosts
    their scripts: the loader fetches the hosted .lua using that key.
-   ⚠️ MOCK DATA — wire the lists / actions to your real Protect-Vmax API.
    ========================================================================== */
 
 const PV = window.PVAuth;
@@ -21,21 +20,10 @@ const CONFIG = {
   HOST_BASE: window.location.origin + "/scripts/hosted",
 };
 
-/* Real data comes from your backend. Left empty on purpose — the dashboard
-   shows 0 / empty states until your API returns something. */
-const MOCK = {
+/* These links are presentation-only. Account data always comes from the API. */
+const DASHBOARD_LINKS = {
   discordInvite: "https://discord.gg/xFeX95Evce",
   ticketUrl: "https://discord.gg/xFeX95Evce",
-  plan: "Vmax",
-  scripts: [
-    {
-      name: "Vmax",
-      status: "online",
-      hwid: 1,
-      executions: 12,
-      created: "2026-08-22",
-    },
-  ], // fallback script for demo sessions
 };
 
 /* ----------------------------- helpers --------------------------------- */
@@ -82,7 +70,7 @@ function hashHex(str, len) {
 
 /* Each Discord user gets a stable, unique API key. */
 function deriveApiKey(user) {
-  const seed = (user.id || "demo") + "|" + (user.username || "demo");
+  const seed = (user.id || "") + "|" + (user.username || "");
   return "VMAX-" + hashHex(seed, 16).toUpperCase();
 }
 
@@ -118,41 +106,25 @@ function normalizeScript(s, apiKey) {
   };
 }
 
-/* Local fallback data (for demo sessions or when offline). */
+/* Empty local fallback for temporary API failures. Never invent account data. */
 function localData(session) {
   const apiKey = deriveApiKey(session.user);
-  const isDemo = Boolean(session && session.demo);
-  const fallbackScripts = isDemo
-    ? [
-        normalizeScript(
-          {
-            name: "Vmax",
-            status: "online",
-            hwid: 1,
-            executions: 12,
-            created: "2026-08-22",
-          },
-          apiKey
-        ),
-      ]
-    : [];
-
   return {
     user: session.user,
     apiKey: apiKey,
-    plan: isDemo ? "Demo" : (MOCK.plan || "Free"),
-    scripts: fallbackScripts,
+    plan: "Free",
+    scripts: [],
   };
 }
 
-/* Fetch real data from your Railway API. Falls back to demo/local data on any failure. */
+/* Fetch real data from your Railway API. Falls back to an empty state on failure. */
 async function getUserData(session) {
-  if (session && session.demo) {
-    return localData(session);
+  if (!session || !session.user || !session.user.id) {
+    throw new Error("Missing authenticated user");
   }
 
   const base = (CONFIG.API_BASE || "").replace(/\/+$/, "");
-  const userId = session && session.user && session.user.id ? session.user.id : "demo";
+  const userId = session.user.id;
   const url = (base ? base : "") + "/api/user/" + encodeURIComponent(userId);
 
   const headers = {};
@@ -168,7 +140,7 @@ async function getUserData(session) {
   return {
     user: session.user,
     apiKey: apiKey,
-    plan: j.plan || (session.demo ? "Demo" : (MOCK.plan || "Free")),
+    plan: j.plan || "Free",
     scripts: Array.isArray(j.scripts)
       ? j.scripts.map(function (s) { return normalizeScript(s, apiKey); })
       : [],
@@ -397,8 +369,8 @@ function viewBot(d) {
           "</div>" +
           '<p class="muted small mt">Your account is linked through your Discord login, so the bot already knows your API key.</p>' +
           '<div class="gate-actions mt">' +
-            '<a class="btn btn-primary btn-sm" href="' + MOCK.discordInvite + '" target="_blank" rel="noopener">Invite bot</a>' +
-            '<a class="btn btn-ghost btn-sm" href="' + MOCK.ticketUrl + '" target="_blank" rel="noopener">Need help</a>' +
+            '<a class="btn btn-primary btn-sm" href="' + DASHBOARD_LINKS.discordInvite + '" target="_blank" rel="noopener">Invite bot</a>' +
+            '<a class="btn btn-ghost btn-sm" href="' + DASHBOARD_LINKS.ticketUrl + '" target="_blank" rel="noopener">Need help</a>' +
           "</div>" +
         "</div>" +
         '<div class="glass card-pad">' +
@@ -443,7 +415,6 @@ function viewSettings(d) {
           '<p class="muted small">You are signed in with Discord. Logging out clears this device\'s session.</p>' +
           '<div class="gate-actions mt">' +
             '<button class="btn btn-cta" id="settings-logout" type="button">Log out</button>' +
-            (d.demo ? '<span class="muted small">Demo session — no real Discord account.</span>' : "") +
           "</div>" +
         "</div>" +
       "</div>" +
@@ -572,10 +543,9 @@ function showView(name) {
 
 /* ----------------------------- screens --------------------------------- */
 function loginGate() {
-  const notConfigured = PV.CONFIG.CLIENT_ID === "YOUR_DISCORD_CLIENT_ID";
+  const notConfigured = !PV.CONFIG.CLIENT_ID || PV.CONFIG.CLIENT_ID === "YOUR_DISCORD_CLIENT_ID";
   const note = notConfigured
-    ? '<p class="gate-note">Set your Discord <code>CLIENT_ID</code> in <code>auth.js</code> to enable real login. ' +
-      'Until then, explore the UI with the <strong>demo</strong> session.</p>'
+    ? '<p class="gate-note">Discord login is not configured yet. Set your Discord <code>CLIENT_ID</code> in <code>auth.js</code> before signing in.</p>'
     : '<p class="gate-note">Authorize Protect-Vmax with your Discord account to continue.</p>';
 
   return (
@@ -591,7 +561,6 @@ function loginGate() {
         note +
         '<div class="gate-actions">' +
           '<button class="btn btn-primary btn-lg" id="gate-login" type="button">Log in with Discord</button>' +
-          (notConfigured ? '<a class="btn btn-ghost btn-lg" href="dashboard.html?demo=1">View demo dashboard</a>' : "") +
         "</div>" +
       "</div>" +
     "</section>"
@@ -643,20 +612,21 @@ async function bootDashboard() {
     }
   }
 
-  let session = PV.getSession();
+  const session = PV.getSession();
 
   if (!PV.isLoggedIn()) {
-    if (PV.isDemoRequested()) {
-      session = PV.makeDemoSession();
-      PV.CONFIG && (session.demo = true);
-      localStorage.setItem("pv_session", JSON.stringify(session));
-      PV.initNavAuth(); // refresh the sidebar user card now
-    } else {
-      root.innerHTML = loginGate();
-      const gate = document.getElementById("gate-login");
-      if (gate) gate.addEventListener("click", function () { PV.login(); });
-      return;
+    root.innerHTML = loginGate();
+    const gate = document.getElementById("gate-login");
+    if (gate) {
+      gate.addEventListener("click", async function () {
+        try {
+          await PV.login();
+        } catch (e) {
+          root.innerHTML = errorScreen(e.message || "Unable to start Discord login.");
+        }
+      });
     }
+    return;
   }
 
   SESSION = session;

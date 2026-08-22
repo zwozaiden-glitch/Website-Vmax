@@ -6,7 +6,8 @@
      2. GET /api/user/:discordId  -> JSON the dashboard expects
         (verifies the Discord access token, then returns apiKey + scripts)
      3. GET /scripts/hosted/<hash>.lua -> the raw .lua the loader fetches
-     4. GET /healthz -> "ok" (Railway health check)
+     4. POST /token -> same-origin Discord OAuth token proxy
+     5. GET /healthz -> "ok" (Railway health check)
 
    Zero dependencies (Node built-ins only). Needs Node 18+.
 
@@ -33,6 +34,7 @@ const STATIC_DIR = process.env.STATIC_DIR
 const PORT = process.env.PORT || 3000;
 const HOST_BASE = process.env.HOST_BASE || "https://vmax-host.up.railway.app/scripts/hosted";
 const DISCORD_API = "https://discord.com/api";
+const DISCORD_TOKEN = "https://discord.com/api/oauth2/token";
 
 /* ---------------------- data stores (REPLACE WITH REAL DB) -------------- *
  * In-memory for now. Wire these to your real database / Discord bot:
@@ -85,7 +87,7 @@ function hashHex(str, len) {
   return s.slice(0, len);
 }
 function deriveApiKey(user) {
-  const seed = (user.id || "demo") + "|" + (user.username || "demo");
+  const seed = (user.id || "") + "|" + (user.username || "");
   return "VMAX-" + hashHex(seed, 16).toUpperCase();
 }
 function hostHash(apiKey, name) {
@@ -111,7 +113,7 @@ function setCommon(res, status, type) {
     "Content-Type": type || "application/json; charset=utf-8",
     "Access-Control-Allow-Origin": "*",
     "Access-Control-Allow-Headers": "Content-Type, Authorization",
-    "Access-Control-Allow-Methods": "GET, OPTIONS",
+    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
   });
 }
 function sendJSON(res, status, obj) {
@@ -121,6 +123,34 @@ function sendJSON(res, status, obj) {
 function sendText(res, status, text, type) {
   setCommon(res, status, type || "text/plain; charset=utf-8");
   res.end(text);
+}
+
+/* The browser uses this same-origin route for the PKCE token exchange. */
+async function handleTokenProxy(req, res) {
+  let body = "";
+  try {
+    for await (const chunk of req) {
+      body += chunk;
+      if (body.length > 64 * 1024) {
+        return sendJSON(res, 413, { error: "request too large" });
+      }
+    }
+
+    const upstream = await fetch(DISCORD_TOKEN, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body,
+    });
+    const text = await upstream.text();
+    setCommon(
+      res,
+      upstream.status,
+      upstream.headers.get("content-type") || "application/json; charset=utf-8"
+    );
+    res.end(text);
+  } catch (err) {
+    sendJSON(res, 502, { error: "token_proxy_failed", detail: String(err) });
+  }
 }
 
 /* ---------------------- routes ------------------------------------------ */
@@ -193,6 +223,10 @@ const server = http.createServer(function (req, res) {
   const pathname = decodeURIComponent(url.pathname);
 
   if (pathname === "/healthz") return sendText(res, 200, "ok");
+  if (pathname === "/token") {
+    if (req.method !== "POST") return sendJSON(res, 405, { error: "method_not_allowed" });
+    return handleTokenProxy(req, res);
+  }
   if (pathname.startsWith("/api/user/")) {
     const id = pathname.slice("/api/user/".length).split("/")[0];
     return handleUser(req, res, id);

@@ -25,7 +25,7 @@ That's it — clicking **Log in** starts the flow and Discord redirects back to 
 
 ### CORS note
 
-Some browsers block the direct token exchange with Discord. If you see a CORS error during login, run the included proxy and point auth.js at it:
+The recommended `railway-server/server.mjs` exposes a same-origin `POST /token` proxy for the PKCE exchange, which is the default configured in `auth.js`. If the static site is deployed separately, run the included proxy and point `TOKEN_PROXY` at its public URL:
 
 ```bash
 node auth-proxy/server.mjs          # listens on http://localhost:3000/token
@@ -33,12 +33,8 @@ node auth-proxy/server.mjs          # listens on http://localhost:3000/token
 
 ```js
 // in auth.js
-const CONFIG = { /* ... */ TOKEN_PROXY: "http://localhost:3000/token" };
+const CONFIG = { /* ... */ TOKEN_PROXY: "https://your-auth-proxy.example/token" };
 ```
-
-## Preview the dashboard without a Discord app
-
-Visit `dashboard.html?demo=1` for a fully populated demo session (mock data). Handy while building the UI. `DEMO_ENABLED` in `auth.js` controls whether `?demo=1` is allowed.
 
 ## Connect the dashboard to your backend (Netlify + Railway)
 
@@ -47,7 +43,7 @@ The site is static; your Railway service is the API. They are **different origin
 1. **Discord OAuth redirect** — in the Discord app, add the origin where **this site** is served + `/dashboard.html`. If you serve the static files from your Railway service, that's:
    `https://vmax-host.up.railway.app/dashboard.html`
    (auth.js derives the redirect URI automatically from the live origin, so just register whatever domain the site actually runs on.)
-2. **`auth.js`** — set `CONFIG.CLIENT_ID` to your Discord app's Client ID (real login stays in demo fallback until you do).
+2. **`auth.js`** — set `CONFIG.CLIENT_ID` to your Discord app's Client ID. The redirect URI is the live site's `/dashboard.html` path.
 3. **`dashboard.js` → `CONFIG.API_BASE`** — set it to your Railway public URL, e.g.
    `"https://discord-project-production-a058.up.railway.app"`. Leave `""` to keep the local empty/zero state. `HOST_BASE` is where hosted `.lua` files live (use your short custom domain in prod, e.g. `https://vmax.dev/s`).
 4. **Railway CORS** — only needed if the static site lives on a **different origin** than the API. Allow the site's origin, e.g.
@@ -73,7 +69,7 @@ The site is static; your Railway service is the API. They are **different origin
 
 ## Notes
 
-- Dashboard data in `dashboard.js` (`MOCK`) is placeholder content — wire it to your real Protect-Vmax API.
+- Dashboard account data comes from the API; failed requests show an empty state rather than fabricated user data.
 - The static site has no backend; the API host / token used by the loader live in `script.js`.
 
 ## Deploy to `vmax-host` (same-origin, recommended)
@@ -83,6 +79,7 @@ The site is static; your Railway service is the API. They are **different origin
 - serves the static files (`index.html`, `dashboard.html`, `*.js/css/svg`),
 - `GET /api/user/:discordId` — verifies the Discord `Bearer` token (calls Discord `/users/@me`), then returns `{ apiKey, plan, scripts }`,
 - `GET /scripts/hosted/<hash>.lua` — returns the raw `.lua` the loader fetches,
+- `POST /token` — same-origin Discord OAuth token proxy used by `auth.js`,
 - `GET /healthz` — health check.
 
 Steps:
