@@ -24,7 +24,7 @@
                       (the three pricing cards).
    ========================================================================== */
 const DISCORD_INVITE = "https://discord.gg/xFeX95Evce";
-const API_HOST = "https://discord-project-production-a058.up.railway.app";
+const API_HOST = "https://vmax-host.up.railway.app";
 const API_TOKEN = "A2F7o-nCC04ed2SrUMftZmXQJ37qvvEn";
 const SCRIPT_NAME = "Vmax";
 const LOADER_PATH = "/api/v1/load";
