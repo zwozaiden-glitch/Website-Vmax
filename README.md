@@ -23,15 +23,17 @@ The site uses the **Authorization Code + PKCE** flow so it works without a serve
 
 That's it — clicking **Log in** starts the flow and Discord redirects back to `/dashboard`, which serves `dashboard.html` and fetches the user.
 
-### Bot connection
+### Login and bot connection
 
-This frontend is connected to the `discord-project` bot service. `auth.js` sends the PKCE token exchange to the bot's `POST /token` endpoint, and `dashboard.js` reads account data, scripts and live bot status from the bot API:
+OAuth login uses Website-Vmax's same-origin `POST /token` endpoint. Login therefore keeps working even if the separate Discord bot domain is asleep, renamed, or temporarily unprovisioned. If the Discord application is not configured as a public OAuth2 client, set `DISCORD_CLIENT_SECRET` on the **Website-Vmax Railway service**; the server adds it during the token exchange and never exposes it to the browser.
+
+Dashboard script data and live bot status come from the `discord-project` bot API:
 
 ```text
 https://discord-project-production-a058.up.railway.app
 ```
 
-If you move the bot to another Railway domain, update `BOT_API_BASE` in `auth.js`. The bot service must allow CORS for the website origin.
+If that service is unavailable, the dashboard falls back to Website-Vmax's same-origin authenticated account endpoint instead of sending the user back to the login screen. If you move the bot to another Railway domain, update `BOT_API_BASE` in `auth.js`. The bot service must allow CORS for the website origin.
 
 ## Connect the dashboard to your backend (Netlify + Railway)
 
@@ -85,4 +87,4 @@ Steps:
 4. In `server.mjs`, start your Discord bot in the same process and call
    `registerScript(discordId, name, luaSource, opts)` from your `/setup` (or equivalent) command so generated scripts appear in the dashboard.
 
-`HOST_BASE` / `PORT` / `STATIC_DIR` can be overridden with environment variables (see the file header). The frontend's `BOT_API_BASE` and `TOKEN_PROXY` should point to the same deployed `discord-project` service.
+`HOST_BASE` / `PORT` / `STATIC_DIR` can be overridden with environment variables (see the file header). `BOT_API_BASE` points to the deployed `discord-project` service; OAuth `TOKEN_PROXY` stays on Website-Vmax's same-origin `/token` route.
