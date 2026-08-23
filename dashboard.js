@@ -14,7 +14,7 @@ const PV = window.PVAuth;
 const BOT_API_BASE = (
   window.PVAuth && window.PVAuth.CONFIG && window.PVAuth.CONFIG.BOT_API_BASE
     ? window.PVAuth.CONFIG.BOT_API_BASE
-    : "https://discord-project-production-a058.up.railway.app"
+    : "https://vmax-host.up.railway.app/"
 ).replace(/\/+$/, "");
 
 const CONFIG = {
