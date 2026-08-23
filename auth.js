@@ -18,7 +18,7 @@ const PVAuth = (function () {
        3. BOT_API_BASE -> the public URL of the connected Discord bot API.
           OAuth itself uses this website's same-origin POST /token route.
      ---------------------------------------------------------------------- */
-  const BOT_API_BASE = "https://discord-project-production-a058.up.railway.app";
+  const BOT_API_BASE = "https://vmax-host.up.railway.app/";
 
   const CONFIG = {
     CLIENT_ID: "1540626944557850624", // <-- your Discord app's Client ID
