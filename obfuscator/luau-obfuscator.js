@@ -379,9 +379,13 @@
     function tableExpr() {
       eat("op", "{");
       const fields = [];
-      if (at("op", "}")) { next(); return { t: "table", fields, vararg: false }; }
       for (;;) {
         const t = peek();
+        if (t.t === "op" && t.v === "}") {
+          // empty table, or a trailing comma:  { 1, 2, }
+          next();
+          return { t: "table", fields, vararg: false };
+        }
         if (t.t === "op" && t.v === "...") {
           next();
           fields.push({ key: null, value: { t: "dots" }, vararg: true });
