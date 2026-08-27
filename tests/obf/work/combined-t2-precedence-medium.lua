@@ -1,0 +1,80 @@
+
+local __out = {}
+local __realPrint = print
+print = function(...)
+  local t = { ... }
+  for i = 1, #t do t[i] = tostring(t[i]) end
+  __out[#__out + 1] = table.concat(t, "\t")
+end
+local function __svc(name)
+  local s = { Name = name }
+  s.GetService = function(self, n) return __svc(n) end
+  return s
+end
+game = { GetService = function(self, n) return __svc(n) end, Players = __svc("Players") }
+workspace = __svc("workspace")
+script = __svc("script")
+shared = {}
+tick = function() return 1234.5 end
+wait = function() return 0 end
+spawn = function() end
+task = { wait = function() end, delay = function() end, spawn = function() end }
+warn = function() end
+getgenv = function() return shared end
+setclipboard = function() end
+writefile = function() return true end
+readfile = function() return "" end
+isfile = function() return false end
+makefolder = function() end
+request = function() return { Status = 200, Body = "{}" } end
+http_request = function() return { Status = 200, Body = "{}" } end
+gethookmt = function() end
+getrawmetatable = function() return {} end
+setreadonly = function() end
+
+local fn = "\x00\x05\x1a\xddM1\x93\x00\x020\x0d\x00\x02\x88\xf6\x00\x15\xae1]\x88S$p\x05\xef~EHn\xe5\x93?\xd1\xb0Zk\xcf\x00\x03W\x11\x86\x00\x01}\x00\x18Sx\x8b|\xa6\x9a\xd0\x173a\x97\xf8\xbd\xd9Z\x1b@~\xd7\xa5\x1e\xb0>\xb4\x00\x12c\xe4\xb7\x01S\xc5\xa2;\xdd\xedJEJ\x0a\xb1:\xad\x94\x00\x05\x05\x89U;\x97\x00\x04?\x8a#Y"
+local function vw(s, n, ...) local k = {...} local o = {} for i = 0, n - 1 do o[i + 1] = string.char(bit32.bxor((fn:byte(s + i) - i * ((13) * 1)) % 256, k[i % #k + 1])) end return table.concat(o) end
+local oa = {[vw((2 + 1), (5) * 1, (106), 0xa2, 0x5a, (100) - 0, 43)] = print}
+oa[vw((3) - 0, 5, 106, (162), 90, (100), (43))]((2) ^ 10)
+oa[vw((3) * 1, (5), (106) - 0, 162, (90) * 1, (100), (43) * 1)]((8 + 2) // (2 + 1))
+oa[vw(3, (5) - 0, (49 + 57), (162) * 1, (90), 100, 43)]((2) * (3) ^ (2))
+oa[vw(0x3, 5, (106) - 0, (122 + 40), (90), 0x64, (43))](-(((4) - 0) ^ (1 + 1)))
+oa[vw((3) * 1, (5) - 0, 106, (162) - 0, 90, 100, 0x2b)](2 ^ (3 ^ (2)))
+oa[vw(0x3, (5) - 0, 106, (162), 0x5a, (54 + 46), (23 + 20))]((10) * 1 - 0 ^ 3)
+oa[vw((3) * 1, 0x5, (106) * 1, (162), 0x5a, 100, (12 + 31))](1 + (2) * (3) ^ ((2) - 0))
+oa[vw((3) - 0, 5, (106), 0xa2, 0x5a, (100) * 1, 0x2b)](100 - (2) ^ 3)
+oa[vw(0x3, (5) - 0, (76 + 30), (162) * 1, 90, 100, (43) - 0)](7 % ((4) * 1) + 1)
+oa[vw((3) * 1, (2 + 3), (106), 162, (90) * 1, (100) * 1, (43) - 0)]((4 + 8) // ((5) * 1) - 1)
+local u, j = 1, (2)
+oa[vw((3) - 0, (2 + 3), 0x6a, (162) * 1, 0x5a, (100) - 0, 0x2b)](u, j)
+u, j = j, u
+local pg = false and true
+oa[vw((3) - 0, 5, 106, 162, (10 + 80), (100), (43))](u, j)
+local o, r, l = 0x3, (4), (5) - 0
+oa[vw((2 + 1), 5, (100 + 6), (141 + 21), 0x5a, (100), 0x2b)](o, r, l)
+while false do local id = 1 end
+o, r, l = l, o, r
+if 1 > (2) * 1 then local yy = 0x3 end
+oa[vw(3, 5, (9 + 97), 162, (90) - 0, (100) - 0, 0x2b)](o, r, l)
+local function f(i, w) local m = i i, w = w, m return i, w end
+local g, k = f(7, (6 + 3))
+oa[vw((3) * 1, (5), (87 + 19), 162, (90) - 0, (54 + 46), (43) * 1)](g, k)
+local z = vw((10), (2) * 1, (81) - 0, (97 + 1), (36) * 1) .. (vw(14, 2, 235, (61 + 80), (113) * 1, 176, (10) - 0) .. 1 + 1)
+oa[vw((3) - 0, 0x5, (53 + 53), 162, 90, 100, (43) * 1)](#z)
+local h = (2) - 0
+h ^= 1
+h = (13 + 3)
+h //= 2
+h = (5) * 1
+h -= (2) - 0
+h += (1 + 2)
+h = 0xa
+h %= (3) * 1
+oa[vw((3) * 1, 0x5, 0x6a, (55 + 107), (90) * 1, 0x64, (2 + 41))](h)
+local function oi(lc) if lc <= 1 then return 1 end return lc * oi(lc - 1) end
+oa[vw((3), (5) - 0, 106, 162, 0x5a, (100) * 1, (43) - 0)](oi(0x5))
+local cq = 0x2
+local nd = 0xa
+oa[vw((1 + 2), 5, 106, 162, (90) - 0, (81 + 19), (26 + 17))](cq ^ nd)
+oa[vw(3, 0x5, 106, 162, 0x5a, (100), (43))](nd - cq ^ 1)
+__realPrint("###PVOBF_OUT###\n" .. table.concat(__out, "\n"))
